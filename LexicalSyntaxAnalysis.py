@@ -265,6 +265,7 @@ class Program(Base) :
         raise FileNotFoundError()
 
     def analyzer(self, filename="") :
+        self.body.clear()
         for line in extractBlock(self.readFile(filename)) :
             a = analyzer(split(line))
             if a :
