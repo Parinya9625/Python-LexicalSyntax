@@ -3,7 +3,7 @@ import datetime as dt
 a = (10 + 20.50) * ((30 ** 2) - 12)
 a, b = 10, 20
 c = "Subscript"[2:4]
-b = "Hello ".capitalize() + "World ! " + ("test" + ") heunthoe"[2::] + str("ste" + "<3\n"))
+b = "Hello ".capitalize() + "World ! " + ("test" + ") heunthoe"[2::] + str("ste" + "<3"))
 d = [1,4,2,7,5,8,6][:4]
 e = (8,5,5,9,0,5,54,8,98,6)[1::2]
 f = {"K1": ("1}23"), "K2": 40, "K3": True}
@@ -45,7 +45,7 @@ for (i, j) in zip(range(1), range(1)) :
     for ah in range(1) :
         print(ah)
         for ahhh in range(1) :
-            print("test \n\\n\\\n test")
+            print("test test")
             for (i, j) in zip(range(1), range(1)) :
                 print(i, j)
                 print(i, j)
