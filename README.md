@@ -1,4 +1,4 @@
-# Python-LexicalSyntax V 0.1
+# Python-LexicalSyntax V 0.2
  
 - [x] Comment
 - [x] Assign Operator
