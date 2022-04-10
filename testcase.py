@@ -61,14 +61,19 @@ a = 10
 b = 20
 c = a > 0 and b == 20
 if a > 0 and (b == 20 and c):
-    print("INSIDE")
+    print("Indent 1")
     if a == 20 :
-        print("Not 20")
+        print("Indent 2")
         if a == 30 :
-            print("Not 30")
+            print("Indent 3")
     elif b == 1 :
-        print("Nothing")
+        print("Indent 2")
     else: 
         print(a)
 else :
-    print("LOWWW")
+    print("Indent 1")
+
+# WHILE
+i = 0
+while i < 10 :
+    i += 1

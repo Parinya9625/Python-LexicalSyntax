@@ -16,4 +16,8 @@
 - [x] Import
 - [x] For
 - [x] If-elif-else
+- [x] While
+- [ ] Function (Def)
+- [ ] Lambda
+- [ ] Class
 - [ ] Other...

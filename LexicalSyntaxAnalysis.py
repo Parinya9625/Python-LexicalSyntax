@@ -92,7 +92,7 @@ def analyzer(value: list) :
             var = s[fi+1:ii]
         
             return For(analyzer([f"({str.join('', var)})"]) if "," in var else analyzer(var), analyzer(s[ii+1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
-        #? Check : If-elif-else
+        #** Check : If-elif-else
         if value[0][0].strip().startswith("if") :
             s = split(value[0][0])
             return If(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
@@ -101,7 +101,10 @@ def analyzer(value: list) :
             return Elif(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
         if value[0][0].strip().startswith("else") :
             return Else([analyzer(split(item)) for item in extractBlock(value[0][1:])])
-    
+        #** : While
+        if value[0][0].strip().startswith("while") :
+            s = split(value[0][0])
+            return While(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
 
     #** Assign 
     if any(map(lambda x: x in value, operator["assign"])):
@@ -310,7 +313,7 @@ class Comment(Base) :
         return "#%s" % (str(self.value).replace("\\'", "'"))
 
     def lexical(self):
-        return {"Comment": [self.value[0:10]]}
+        return {"Comment": [self.value]}
 
 class Assign(Base) :
     def __init__(self, var, op, value) -> "Assign":
@@ -569,3 +572,14 @@ class Else(Base) :
     
     def lexical(self):
         return mergeDict({"Keyword": ["else"]}, *[item.lexical() for item in self.body])
+
+class While(Base) :
+    def __init__(self, condition, body) -> "While":
+        self.condition = condition
+        self.body = body
+
+    def __str__(self) -> str:
+        return "while %s :%s" % (self.condition, "".join([f"\n{item}" for item in self.body]).replace("\n", "\n    "))
+
+    def lexical(self):
+        return mergeDict({"Keyword": ["while"]}, *[self.condition.lexical(), *[item.lexical() for item in self.body]])
