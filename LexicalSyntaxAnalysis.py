@@ -92,7 +92,7 @@ def analyzer(value: list) :
             var = s[fi+1:ii]
         
             return For(analyzer([f"({str.join('', var)})"]) if "," in var else analyzer(var), analyzer(s[ii+1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
-        #** Check : If-elif-else
+        #** : If-elif-else
         if value[0][0].strip().startswith("if") :
             s = split(value[0][0])
             return If(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
