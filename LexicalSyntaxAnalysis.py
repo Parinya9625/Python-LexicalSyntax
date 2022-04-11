@@ -202,6 +202,12 @@ def analyzer(value: list) :
             return Constant(float(value[0]))
         if re.match(regPattern["int"], value[0]) :
             return Constant(int(value[0]))
+        if value[0] == "break" :
+            return Break()
+        if value[0] == "pass" :
+            return Pass()
+        if value[0] == "continue" :
+            return Continue()
         if value[0].isidentifier() and value[0] not in keyword :
             if len(value) > 1 :
                 return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
@@ -253,7 +259,7 @@ def extractBlock(value: list) :
 class Base :
     def __repr__(self) -> str:
         base = "{}={}"
-        args = ", ".join([base.format(key, f"'{self.__dict__[key]}'" if isinstance(self.__dict__[key], str) else f"{repr(self.__dict__[key])}") for key in self.__dict__])
+        args = ", ".join([base.format(key, f"'{self.__dict__[key]}'".replace("\\", "\\\\") if isinstance(self.__dict__[key], str) else f"{repr(self.__dict__[key])}") for key in self.__dict__])
         return "{}({})".format(self.__class__.__name__, args)
     
     def __str__(self) -> str:
@@ -583,3 +589,24 @@ class While(Base) :
 
     def lexical(self):
         return mergeDict({"Keyword": ["while"]}, *[self.condition.lexical(), *[item.lexical() for item in self.body]])
+
+class Break(Base) :
+    def __str__(self) -> str:
+        return "break"
+    
+    def lexical(self):
+        return {"Keyword": ["break"]}
+
+class Pass(Base) :
+    def __str__(self) -> str:
+        return "pass"
+
+    def lexical(self):
+        return {"Keyword": ["pass"]}
+
+class Continue(Base) :
+    def __str__(self) -> str:
+        return "continue"
+
+    def lexical(self):
+        return {"Keyword": ["continue"]}
