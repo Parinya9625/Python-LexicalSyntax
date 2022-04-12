@@ -23,7 +23,7 @@ regPattern = {
     "str": r"(\".*?\"|\'.*?\')",
     "float": r"(\d+\.{1}\d+)",
     "int": r"(\d+)",
-    "tuple": r"(^\(.+\)$)",
+    "tuple": r"(^\(.*\)$)",
     "list": r"\[.*\]",
     "dict": r"\{.*\}",
     "fn": r"([a-zA-Z_]+[a-zA-Z_0-9.]*\()",
@@ -180,6 +180,8 @@ def analyzer(value: list) :
 
     #** Tuple / Parentheses
     if re.match(regPattern["tuple"], value[0], flags=re.M) :
+        if len(value[0][1:-1]) == 0 :
+            return Tuple([])
         if "," in split(value[0][1:-1]) :
             if len(value) > 1 :
                 return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
@@ -197,6 +199,8 @@ def analyzer(value: list) :
     #** Dict / Set
     if re.match(regPattern["dict"], value[0]) :
         s = split(value[0][1:-1], isCollection=True)
+        if len(value[0][1:-1]) == 0 :
+            return Dict([], [])
         if len(s) > 0 and ":" in s[0] :
             if len(value) > 1 :
                 return Subscript(analyzer([value[0]]), Index(Constant(value[1][2:-2])))
