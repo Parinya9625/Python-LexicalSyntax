@@ -17,7 +17,7 @@
 - [x] For
 - [x] If-elif-else
 - [x] While
-- [-] Function (Def) : Basic
+- [x] Function (Def) : Basic
 - [ ] Lambda
 - [ ] Class
 - [ ] Other...
