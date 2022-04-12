@@ -105,6 +105,16 @@ def analyzer(value: list) :
         if value[0][0].strip().startswith("while") :
             s = split(value[0][0])
             return While(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+        #** : Def (Basic)
+        if value[0][0].strip().startswith("def") :
+            s = split(value[0][0])
+            fn: Function = analyzer([s[1]])
+
+            return DefFunction(fn.func, fn.args, fn.keyword, [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+
+    #** : Return
+    if value[0] == "return" :
+        return Return(analyzer(value[1:]))
 
     #** Assign 
     if any(map(lambda x: x in value, operator["assign"])):
@@ -137,7 +147,6 @@ def analyzer(value: list) :
         left = index - list(map(lambda x: x in allCom, value[:index])).index(True) if any(map(lambda x: x in value[:index], allCom)) else 0
         right = index + 1 + list(map(lambda x: x in allCom, value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], allCom)) else len(value)        
         return analyzer(value[:left] + [Compare(analyzer(value[left:index]), value[index], analyzer(value[index+1:right]))] + value[right:])
-
 
     #** Comment 
     if re.match(regPattern["comment"], value[0]) :
@@ -178,6 +187,8 @@ def analyzer(value: list) :
         return Group(analyzer(split(value[0][1:-1], isCollection=True)[0]))
     #** List / Subscript
     if re.match(regPattern["list"], value[0]) :
+        if len(value[0][1:-1]) == 0 :
+            return List([])
         if "," in split(value[0][1:-1]) :
             if len(value) > 1 :
                 return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
@@ -475,7 +486,7 @@ class Call(Base) :
         self.keyword = keyword
 
     def __str__(self) -> str:
-        return "%s(%s)" % (self.func, ", ".join([str(item) for item in self.args] + [str(item) for item in self.keyword]), )
+        return "%s(%s)" % (self.func, ", ".join([str(item) for item in self.args] + [str(item) for item in self.keyword]))
 
     def lexical(self):
         return {"Function": [str(self)]}
@@ -610,3 +621,26 @@ class Continue(Base) :
 
     def lexical(self):
         return {"Keyword": ["continue"]}
+
+class DefFunction(Base) :
+    def __init__(self, func, args=[], keyword=[], body=[]) -> "DefFunction":
+        self.func = func
+        self.args = args
+        self.keyword = keyword
+        self.body = body
+
+    def __str__(self) -> str:
+        return "def %s(%s) :%s" % (self.func, ", ".join([str(item) for item in self.args] + [str(item) for item in self.keyword]), "".join([f"\n{item}" for item in self.body]).replace("\n", "\n    "))
+
+    def lexical(self):
+        return mergeDict({"Keyword": ["def"], "Function": [str(Call(self.func, self.args, self.keyword))]}, *[item.lexical() for item in self.body])
+
+class Return(Base) :
+    def __init__(self, value) -> "Return":
+        self.value = value
+
+    def __str__(self) -> str:
+        return "return %s" % (self.value)
+
+    def lexical(self):
+        return mergeDict({"Keyword": ["return"]}, *[self.value.lexical()])
