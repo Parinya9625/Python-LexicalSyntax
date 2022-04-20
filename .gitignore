@@ -154,4 +154,5 @@ cython_debug/
 # Code generate from lsa
 generate.py
 /Ignore
+/Example
 test.py
