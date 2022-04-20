@@ -8,17 +8,29 @@
 """
 
 import LexicalSyntaxAnalysis as lsa
+import pyperclip
 
 program = lsa.Program()
-program.analyzer("testcase.py")
+program.analyzer("Example/Large_Num.py")
 
+# Lexical
 print("\n" + str.center(" Lexical ", 100, "="))
-print(program.getLexical())
+lex = program.getLexical()
+for key in lex :
+    print(key, lex[key])
+
+# Syntax
 print("\n" + str.center(" Syntax Structure ", 100, "="))
 print(program)
-print("\n" + str.center(" Code ", 100, "="))
-print(program.toCode())
-print("\n" + str.center(" Output ", 100, "="))
-program.run()
-# Generate code from syntax structure
-program.toFile("generate.py")
+pyperclip.copy(str(program))
+
+
+# # Checking / Debug
+# # create code from syntax structure
+# print("\n" + str.center(" Code ", 100, "="))
+# print(program.toCode())
+# # run code
+# print("\n" + str.center(" Output ", 100, "="))
+# program.run()
+# # generate code
+# program.toFile("generate.py")
