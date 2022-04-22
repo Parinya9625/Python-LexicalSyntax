@@ -79,136 +79,140 @@ def split(value: str, isCollection=False) :
     return mergeCollection(merge) if isCollection else merge
 
 def analyzer(value: list) :
-    if not value :
-        return Blank()
-    if len(value) == 1 and not isinstance(value[0], (str, list)):
-        return value[0]
-
-    if isinstance(value[0], list) :
-        #** : For
-        if value[0][0].strip().startswith("for") :
-            s = split(value[0][0])
-            fi, ii = s.index("for"), s.index("in")
-            var = s[fi+1:ii]
-        
-            return For(analyzer([f"({str.join('', var)})"]) if "," in var else analyzer(var), analyzer(s[ii+1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
-        #** : If-elif-else
-        if value[0][0].strip().startswith("if") :
-            s = split(value[0][0])
-            return If(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
-        if value[0][0].strip().startswith("elif") :
-            s = split(value[0][0])
-            return Elif(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
-        if value[0][0].strip().startswith("else") :
-            return Else([analyzer(split(item)) for item in extractBlock(value[0][1:])])
-        #** : While
-        if value[0][0].strip().startswith("while") :
-            s = split(value[0][0])
-            return While(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
-        #** : Def (Basic)
-        if value[0][0].strip().startswith("def") :
-            s = split(value[0][0])
-            fn: Function = analyzer([s[1]])
-
-            return DefFunction(fn.func, fn.args, fn.keyword, [analyzer(split(item)) for item in extractBlock(value[0][1:])])
-
-    #** : Return
-    if value[0] == "return" :
-        return Return(analyzer(value[1:]))
-
-    #** Assign 
-    if any(map(lambda x: x in value, operator["assign"])):
-        index = list(map(lambda x: x in operator["assign"], value)).index(True)
-        if "," in value[:index] :
-            return Assign(analyzer([f"({str.join('', value[:index])})"]), value[index], analyzer([f"({str.join('', value[index+1:])})"]))
-        return Assign(analyzer(value[:index]), value[index], analyzer(value[index+1:]))
-    #** Operator 
-    if any(map(lambda x: x in value, operator["math"])) :
-        index = list(map(lambda x: x in operator["math"], value)).index(True)
-        index = index + 1 if value[index+1] in operator["math"] else index
-
-        if index == 0 or value[index-1] in operator["math"] :
-            return analyzer(value[:index] + [UnaryOperator(value[index], analyzer([value[index+1]]))] + value[index+2:])
-
-        left = list(map(lambda x: x in operator["math"], value[:index])).index(True) if any(map(lambda x: x in value[:index], operator["math"])) else 0
-        right = list(map(lambda x: x in operator["math"], value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], operator["math"])) else len(value[index+1:])
-        return analyzer(value[:left] + [Operator(analyzer(value[left:index]), value[index], analyzer(value[index+1:index+1+right]))] + value[index+1+right:])
-    #** Compare Op
-    if any(map(lambda x: x in value, operator["compare"])) :
-        index = list(map(lambda x: x in operator["compare"], value)).index(True)
-        allCom = operator["compare"] + operator["bool"]
-        left = index - list(map(lambda x: x in allCom, value[:index])).index(True) if any(map(lambda x: x in value[:index], allCom)) else 0
-        right = index + 1 + list(map(lambda x: x in allCom, value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], allCom)) else len(value)        
-        return analyzer(value[:left] + [Compare(analyzer(value[left:index]), value[index], analyzer(value[index+1:right]))] + value[right:])
-    #** Bool Op (Compare)
-    if any(map(lambda x: x in value, operator["bool"])) :
-        index = list(map(lambda x: x in operator["bool"], value)).index(True)
-        allCom = operator["compare"] + operator["bool"]
-        left = index - list(map(lambda x: x in allCom, value[:index])).index(True) if any(map(lambda x: x in value[:index], allCom)) else 0
-        right = index + 1 + list(map(lambda x: x in allCom, value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], allCom)) else len(value)        
-        return analyzer(value[:left] + [Compare(analyzer(value[left:index]), value[index], analyzer(value[index+1:right]))] + value[right:])
-
-    #** Comment 
-    if re.match(regPattern["comment"], value[0]) :
-        return Comment(value[0][value[0].index("#")+1:])
-    #** Import
-    if re.match(regPattern["import"], value[0], flags=re.M) :
-        if value[0] == "import" :
-            return Import([Alias(item[0], item[2] if len(item) == 3 else None) for item in split(value[1], isCollection=True)])
-        return Module(value[1], analyzer(value[2::]))
-
-    #** Call Function
-    if re.match(regPattern["fn"], value[0]): 
-        s = [item[:-1] for item in re.split(regPattern["fn"], value[0], maxsplit=1) if item]
-        args = split(s[1], isCollection=True)
-
-        # Find index of keyword args
-        index = None
-        if any(map(lambda x: "=" in x, args)) :
-            index = list(map(lambda x: "=" in x, args)).index(True)
-
-        # Connect all attribute and function name
-        attr = [Attribute(attr, None) for attr in s[0].split(".")[:-1]] + [Function(s[0].split(".")[-1])]
-        for i in range(len(attr)-1) :
-            attr[i].func = attr[i+1]
-        
-        return Call(attr[0], [analyzer(item) for item in args[:index] if item != []], [Keyword(item[0], analyzer([item[2]])) for item in args[index:]] if index != None else [])
-    #** Value with Attribute
-    if "." in value :
-        attr = analyzer([value[2]])
-        return Call(Attribute(analyzer([value[0]]), attr.func), attr.args, attr.keyword) if isinstance(attr, Function) else Attribute(analyzer([value[0]]), attr)
-
-    #** Tuple / Parentheses
-    if re.match(regPattern["tuple"], value[0], flags=re.M) :
-        if len(value[0][1:-1]) == 0 :
-            return Tuple([])
-        if "," in split(value[0][1:-1]) :
-            if len(value) > 1 :
-                return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
-            return Tuple([analyzer(item) for item in split(value[0][1:-1], isCollection=True)])
-        return Group(analyzer(split(value[0][1:-1], isCollection=True)[0]))
-    #** List / Subscript
-    if re.match(regPattern["list"], value[0]) :
-        if len(value[0][1:-1]) == 0 :
-            return List([])
-        if "," in split(value[0][1:-1]) :
-            if len(value) > 1 :
-                return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
-            return List([analyzer(item) for item in split(value[0][1:-1], isCollection=True)])
-        return Slice(*[analyzer([item]) for item in value[0][1:-1].split(":") + [None, None, None]][0:3])
-    #** Dict / Set
-    if re.match(regPattern["dict"], value[0]) :
-        s = split(value[0][1:-1], isCollection=True)
-        if len(value[0][1:-1]) == 0 :
-            return Dict([], [])
-        if len(s) > 0 and ":" in s[0] :
-            if len(value) > 1 :
-                return Subscript(analyzer([value[0]]), Index(Constant(value[1][2:-2])))
-            return Dict([analyzer(item[:item.index(":")]) for item in s], [analyzer(item[item.index(":")+1:]) for item in s])
-        return Set([analyzer(item) for item in s])
-
-    #** Constance Value / Variable
     try :
+        if not value :
+            return Blank()
+        if len(value) == 1 and not isinstance(value[0], (str, list)):
+            return value[0]
+
+        if isinstance(value[0], list) :
+            #** : For
+            if value[0][0].strip().startswith("for") :
+                s = split(value[0][0])
+                fi, ii = s.index("for"), s.index("in")
+                var = s[fi+1:ii]
+            
+                return For(analyzer([f"({str.join('', var)})"]) if "," in var else analyzer(var), analyzer(s[ii+1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+            #** : If-elif-else
+            if value[0][0].strip().startswith("if") :
+                s = split(value[0][0])
+                return If(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
+            if value[0][0].strip().startswith("elif") :
+                s = split(value[0][0])
+                return Elif(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])], analyzer(value[1:]))
+            if value[0][0].strip().startswith("else") :
+                return Else([analyzer(split(item)) for item in extractBlock(value[0][1:])])
+            #** : While
+            if value[0][0].strip().startswith("while") :
+                s = split(value[0][0])
+                return While(analyzer(s[1:-1]), [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+            #** : Def (Basic)
+            if value[0][0].strip().startswith("def") :
+                s = split(value[0][0])
+                fn: Function = analyzer([s[1]])
+
+                return DefFunction(fn.func, fn.args, fn.keyword, [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+
+            #** Unknown / not implement block value
+            return Unknown(value[0][0], [analyzer(split(item)) for item in extractBlock(value[0][1:])])
+            
+
+        #** : Return
+        if value[0] == "return" :
+            return Return(analyzer(value[1:]))
+
+        #** Assign 
+        if any(map(lambda x: x in value, operator["assign"])):
+            index = list(map(lambda x: x in operator["assign"], value)).index(True)
+            if "," in value[:index] :
+                return Assign(analyzer([f"({str.join('', value[:index])})"]), value[index], analyzer([f"({str.join('', value[index+1:])})"]))
+            return Assign(analyzer(value[:index]), value[index], analyzer(value[index+1:]))
+        #** Operator 
+        if any(map(lambda x: x in value, operator["math"])) :
+            index = list(map(lambda x: x in operator["math"], value)).index(True)
+            index = index + 1 if value[index+1] in operator["math"] else index
+
+            if index == 0 or value[index-1] in operator["math"] :
+                return analyzer(value[:index] + [UnaryOperator(value[index], analyzer([value[index+1]]))] + value[index+2:])
+
+            left = list(map(lambda x: x in operator["math"], value[:index])).index(True) if any(map(lambda x: x in value[:index], operator["math"])) else 0
+            right = list(map(lambda x: x in operator["math"], value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], operator["math"])) else len(value[index+1:])
+            return analyzer(value[:left] + [Operator(analyzer(value[left:index]), value[index], analyzer(value[index+1:index+1+right]))] + value[index+1+right:])
+        #** Compare Op
+        if any(map(lambda x: x in value, operator["compare"])) :
+            index = list(map(lambda x: x in operator["compare"], value)).index(True)
+            allCom = operator["compare"] + operator["bool"]
+            left = index - list(map(lambda x: x in allCom, value[:index])).index(True) if any(map(lambda x: x in value[:index], allCom)) else 0
+            right = index + 1 + list(map(lambda x: x in allCom, value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], allCom)) else len(value)        
+            return analyzer(value[:left] + [Compare(analyzer(value[left:index]), value[index], analyzer(value[index+1:right]))] + value[right:])
+        #** Bool Op (Compare)
+        if any(map(lambda x: x in value, operator["bool"])) :
+            index = list(map(lambda x: x in operator["bool"], value)).index(True)
+            allCom = operator["compare"] + operator["bool"]
+            left = index - list(map(lambda x: x in allCom, value[:index])).index(True) if any(map(lambda x: x in value[:index], allCom)) else 0
+            right = index + 1 + list(map(lambda x: x in allCom, value[index+1:])).index(True) if any(map(lambda x: x in value[index+1:], allCom)) else len(value)        
+            return analyzer(value[:left] + [Compare(analyzer(value[left:index]), value[index], analyzer(value[index+1:right]))] + value[right:])
+
+        #** Comment 
+        if re.match(regPattern["comment"], value[0]) :
+            return Comment(value[0][value[0].index("#")+1:])
+        #** Import
+        if re.match(regPattern["import"], value[0], flags=re.M) :
+            if value[0] == "import" :
+                return Import([Alias(item[0], item[2] if len(item) == 3 else None) for item in split(value[1], isCollection=True)])
+            return Module(value[1], analyzer(value[2::]))
+
+        #** Call Function
+        if re.match(regPattern["fn"], value[0]): 
+            s = [item[:-1] for item in re.split(regPattern["fn"], value[0], maxsplit=1) if item]
+            args = split(s[1], isCollection=True)
+
+            # Find index of keyword args
+            index = None
+            if any(map(lambda x: "=" in x, args)) :
+                index = list(map(lambda x: "=" in x, args)).index(True)
+
+            # Connect all attribute and function name
+            attr = [Attribute(attr, None) for attr in s[0].split(".")[:-1]] + [Function(s[0].split(".")[-1])]
+            for i in range(len(attr)-1) :
+                attr[i].func = attr[i+1]
+            
+            return Call(attr[0], [analyzer(item) for item in args[:index] if item != []], [Keyword(item[0], analyzer([item[2]])) for item in args[index:]] if index != None else [])
+        #** Value with Attribute
+        if "." in value :
+            attr = analyzer([value[2]])
+            return Call(Attribute(analyzer([value[0]]), attr.func), attr.args, attr.keyword) if isinstance(attr, Function) else Attribute(analyzer([value[0]]), attr)
+
+        #** Tuple / Parentheses
+        if re.match(regPattern["tuple"], value[0], flags=re.M) :
+            if len(value[0][1:-1]) == 0 :
+                return Tuple([])
+            if "," in split(value[0][1:-1]) :
+                if len(value) > 1 :
+                    return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
+                return Tuple([analyzer(item) for item in split(value[0][1:-1], isCollection=True)])
+            return Group(analyzer(split(value[0][1:-1], isCollection=True)[0]))
+        #** List / Subscript
+        if re.match(regPattern["list"], value[0]) :
+            if len(value[0][1:-1]) == 0 :
+                return List([])
+            if "," in split(value[0][1:-1]) :
+                if len(value) > 1 :
+                    return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
+                return List([analyzer(item) for item in split(value[0][1:-1], isCollection=True)])
+            return Slice(*[analyzer([item]) for item in value[0][1:-1].split(":") + [None, None, None]][0:3])
+        #** Dict / Set
+        if re.match(regPattern["dict"], value[0]) :
+            s = split(value[0][1:-1], isCollection=True)
+            if len(value[0][1:-1]) == 0 :
+                return Dict([], [])
+            if len(s) > 0 and ":" in s[0] :
+                if len(value) > 1 :
+                    return Subscript(analyzer([value[0]]), Index(Constant(value[1][2:-2])))
+                return Dict([analyzer(item[:item.index(":")]) for item in s], [analyzer(item[item.index(":")+1:]) for item in s])
+            return Set([analyzer(item) for item in s])
+
+        #** Constance Value / Variable
         if re.match(regPattern["str"], value[0]) :
             if len(value) > 1 :
                 return Subscript(analyzer([value[0]]), analyzer([value[1]]) if ":" in value[1] else Index(analyzer([value[1][1:-1]])))
@@ -230,13 +234,18 @@ def analyzer(value: list) :
         if value[0] in ["True", "False", "None"] :
             return Constant(eval(value[0]))
 
+        #** Unknown / not implement value
+        return Unknown(str.join("", value))
+
     except Exception as e :
-        return None
+        return Unknown(str.join("", value))
+
 
 def extractBlock(value: list) :
     spb = ["elif", "else"]
     indent = list(map(lambda x: len(x) - len(x.lstrip()) if len(x.strip()) > 0 else None, value))
-    indent = [item if item != None else indent[i-1] for i, item in enumerate(indent)]
+    while None in indent :
+        indent = [item if item != None else indent[i-1] for i, item in enumerate(indent)]
     block = []
     base = indent[0]
     index = 0
@@ -325,6 +334,17 @@ class Program(Base) :
 class Blank(Base) :
     def __str__(self) -> str:
         return ""
+
+class Unknown(Base) :
+    def __init__(self, value, body=[]) -> "Unknown":
+        self.value = value
+        self.body = body
+    
+    def __str__(self) -> str:
+        return "%s%s" % (self.value, "".join([f"\n{item}" for item in self.body]).replace("\n", "\n    "))
+
+    def lexical(self):
+        return mergeDict({"Unknown / Not Implement / Error": [self.value]}, *[item.lexical() for item in self.body])
 
 class Comment(Base) :
     def __init__(self, value) -> "Comment":
